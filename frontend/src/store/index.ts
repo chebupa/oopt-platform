@@ -27,17 +27,37 @@ export interface Application {
   photoUrl?: string;
 }
 
+export interface DzzAlert {
+  id: string;
+  title: string;
+  description: string;
+  coordinates: [number, number];
+  date: string;
+  type: 'deforestation' | 'fire' | 'pollution' | 'other';
+  images: {
+    normal: string;
+    infrared: string;
+    ndvi: string; // rtvi
+    ndwi: string; // rtwi
+    moisture: string;
+  };
+}
+
 interface AppState {
   currentUser: { role: UserRole; name: string } | null;
   tasks: Task[];
   reports: Report[];
   applications: Application[];
+  dzzAlerts: DzzAlert[];
   setCurrentUser: (role: UserRole, name: string) => void;
   logout: () => void;
   addTask: (task: Omit<Task, 'id' | 'status'>) => void;
   completeTask: (taskId: string) => void;
   approveApplication: (appId: string) => void;
   rejectApplication: (appId: string) => void;
+  convertAlertToTask: (alertId: string) => void;
+  removeAlert: (alertId: string) => void;
+  removeTask: (taskId: string) => void;
 }
 
 const initialTasks: Task[] = [
@@ -88,11 +108,45 @@ const initialApplications: Application[] = [
   }
 ];
 
+const initialDzzAlerts: DzzAlert[] = [
+  {
+    id: 'a1',
+    title: 'Подозрение на незаконную вырубку',
+    description: 'Аномальное изменение NDVI. Требуется выезд на место для фиксации масштабов вырубки.',
+    coordinates: [37.735, 55.845],
+    date: 'Сегодня, 08:15',
+    type: 'deforestation',
+    images: {
+      normal: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260823T084731_R107_T37VDC_20260823T153512&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      infrared: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260823T084731_R107_T37VDC_20260823T153512&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      ndvi: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260823T084731_R107_T37VDC_20260823T153512&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      ndwi: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260823T084731_R107_T37VDC_20260823T153512&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      moisture: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260823T084731_R107_T37VDC_20260823T153512&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+    }
+  },
+  {
+    id: 'a2',
+    title: 'Возможное возгорание (термоточка)',
+    description: 'Зафиксирована термическая аномалия в лесном массиве. Требуется проверить наличие открытого огня.',
+    coordinates: [37.710, 55.850],
+    date: 'Вчера, 14:30',
+    type: 'fire',
+    images: {
+      normal: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260717T084559_R107_T37VDC_20260717T110540&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      infrared: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260717T084559_R107_T37VDC_20260717T110540&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      ndvi: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260717T084559_R107_T37VDC_20260717T110540&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      ndwi: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260717T084559_R107_T37VDC_20260717T110540&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+      moisture: 'https://planetarycomputer.microsoft.com/api/data/v1/item/preview.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260717T084559_R107_T37VDC_20260717T110540&assets=visual&asset_bidx=visual%7C1%2C2%2C3&nodata=0&format=png',
+    }
+  }
+];
+
 export const useAppStore = create<AppState>((set) => ({
   currentUser: null,
   tasks: initialTasks,
   reports: [],
   applications: initialApplications,
+  dzzAlerts: initialDzzAlerts,
   setCurrentUser: (role, name) => set({ currentUser: { role, name } }),
   logout: () => set({ currentUser: null }),
   addTask: (task) => set((state) => ({
@@ -107,4 +161,28 @@ export const useAppStore = create<AppState>((set) => ({
   rejectApplication: (appId) => set((state) => ({
     applications: state.applications.map(a => a.id === appId ? { ...a, status: 'rejected' } : a)
   })),
+  convertAlertToTask: (alertId) => set((state) => {
+    const alert = state.dzzAlerts.find(a => a.id === alertId);
+    if (!alert) return state;
+    
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: `Проверка по ДЗЗ: ${alert.title}`,
+      description: alert.description,
+      coordinates: alert.coordinates,
+      status: 'open'
+    };
+    
+    return {
+      tasks: [...state.tasks, newTask],
+      dzzAlerts: state.dzzAlerts.filter(a => a.id !== alertId)
+    };
+  }),
+  removeAlert: (alertId) => set((state) => ({
+    dzzAlerts: state.dzzAlerts.filter(a => a.id !== alertId)
+  })),
+  removeTask: (taskId) => set((state) => ({
+    tasks: state.tasks.filter(t => t.id !== taskId)
+  }))
 }));
+

@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { currentUser, logout, tasks, completeTask, applications, approveApplication, rejectApplication } = useAppStore();
+  const { currentUser, logout, tasks, completeTask, applications, approveApplication, rejectApplication, dzzAlerts, convertAlertToTask, removeTask } = useAppStore();
   const [layer, setLayer] = useState('rgb');
   const [upsellOpen, setUpsellOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [photoAttached, setPhotoAttached] = useState(false);
   const [photoViewOpen, setPhotoViewOpen] = useState(false);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [selectedPhotoFilter, setSelectedPhotoFilter] = useState<string>('');
 
   useEffect(() => {
     if (!currentUser) {
@@ -95,6 +96,45 @@ export default function Dashboard() {
                 </p>
               </div>
 
+
+
+              <div className="pt-4 border-t space-y-4">
+                <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
+                  <MapPin className="h-4 w-4" /> Опубликованные задания
+                </h3>
+                {tasks.length === 0 && <p className="text-sm text-gray-500">Нет опубликованных заданий.</p>}
+                
+                {tasks.map(task => (
+                  <Card key={task.id} className={task.status === 'completed' ? 'opacity-60 bg-gray-50' : ''}>
+                    <CardHeader className="p-3 pb-1">
+                      <CardTitle className="text-sm font-semibold flex items-start justify-between">
+                        <span>{task.title}</span>
+                        {task.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 ml-2" />}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        {task.status === 'open' ? 'В ожидании выполнения' : 'Выполнено'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-1 text-sm text-gray-600">
+                      {task.description && <p className="mb-2">{task.description}</p>}
+                      <div className="flex gap-2 mt-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          onClick={() => {
+                            removeTask(task.id);
+                            toast.success('Задание удалено');
+                          }}
+                        >
+                          <X className="h-3 w-3 mr-1" /> Удалить
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
               <div className="pt-4 border-t space-y-4">
                 <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
                   <Inbox className="h-4 w-4" /> Заявки волонтеров
@@ -122,7 +162,7 @@ export default function Dashboard() {
                     <CardContent className="p-3 pt-1 text-sm text-gray-600">
                       {app.comment && (
                         <p className="bg-white p-2 rounded border text-xs italic mb-2">
-                          "{app.comment}"
+                          &quot;{app.comment}&quot;
                         </p>
                       )}
                       
@@ -131,6 +171,7 @@ export default function Dashboard() {
                           className="mb-3 relative w-full h-24 rounded border overflow-hidden cursor-pointer group"
                           onClick={() => {
                             setSelectedPhotoUrl(app.photoUrl || null);
+                            setSelectedPhotoFilter('');
                             setPhotoViewOpen(true);
                           }}
                         >
@@ -227,9 +268,122 @@ export default function Dashboard() {
       </div>
 
       {/* Map Area */}
-      <div className="flex-1 relative h-1/2 md:h-full">
+      <div className="flex-1 relative h-1/2 md:h-full min-h-[300px]">
         <MapComponent layer={layer} />
       </div>
+
+      {/* Right Sidebar for DZZ Alerts (Inspector Only) */}
+      {currentUser.role === 'inspector' && (
+        <div className="w-full md:w-80 bg-white border-l flex flex-col z-10 shadow-sm h-1/3 md:h-full overflow-y-auto">
+          <div className="p-4 border-b bg-gray-50 sticky top-0 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Алерты ДЗЗ
+            </h2>
+          </div>
+          
+          <div className="p-4 flex-1 overflow-y-auto space-y-4 bg-red-50/10">
+            {dzzAlerts.length === 0 && <p className="text-sm text-gray-500">Нет новых алертов.</p>}
+            
+            {dzzAlerts.map(alert => (
+              <Card key={alert.id} className="border-red-100 bg-red-50/30">
+                <CardHeader className="p-3 pb-1">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-sm font-semibold flex flex-col">
+                      <span className="text-red-700 leading-tight">{alert.title}</span>
+                      <span className="text-xs text-gray-500 font-normal mt-1">{alert.date}</span>
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-xs font-medium text-gray-800 mt-1">
+                    {alert.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-3 pt-2 text-sm text-gray-600 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">Обычный</span>
+                      <div 
+                        className="relative w-full h-16 rounded border overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedPhotoUrl(alert.images.normal);
+                          setSelectedPhotoFilter('');
+                          setPhotoViewOpen(true);
+                        }}
+                      >
+                        <img src={alert.images.normal} alt="Обычный спектр" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">ИК (SWIR)</span>
+                      <div 
+                        className="relative w-full h-16 rounded border overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedPhotoUrl(alert.images.infrared);
+                          setSelectedPhotoFilter('sepia hue-rotate-[-50deg] saturate-200');
+                          setPhotoViewOpen(true);
+                        }}
+                      >
+                        <img src={alert.images.infrared} alt="Инфракрасный спектр" className="w-full h-full object-cover transition-transform group-hover:scale-105 sepia hue-rotate-[-50deg] saturate-200" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">RTVI</span>
+                      <div 
+                        className="relative w-full h-16 rounded border overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedPhotoUrl(alert.images.ndvi);
+                          setSelectedPhotoFilter('sepia hue-rotate-[50deg] saturate-200 contrast-125');
+                          setPhotoViewOpen(true);
+                        }}
+                      >
+                        <img src={alert.images.ndvi} alt="RTVI спектр" className="w-full h-full object-cover transition-transform group-hover:scale-105 sepia hue-rotate-[50deg] saturate-200 contrast-125" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">RTWI</span>
+                      <div 
+                        className="relative w-full h-16 rounded border overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedPhotoUrl(alert.images.ndwi);
+                          setSelectedPhotoFilter('sepia hue-rotate-[180deg] saturate-150 contrast-150');
+                          setPhotoViewOpen(true);
+                        }}
+                      >
+                        <img src={alert.images.ndwi} alt="RTWI спектр" className="w-full h-full object-cover transition-transform group-hover:scale-105 sepia hue-rotate-[180deg] saturate-150 contrast-150" />
+                      </div>
+                    </div>
+                    <div className="space-y-1 col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-gray-500">Влажность (Moisture)</span>
+                      <div 
+                        className="relative w-full h-16 rounded border overflow-hidden cursor-pointer group"
+                        onClick={() => {
+                          setSelectedPhotoUrl(alert.images.moisture);
+                          setSelectedPhotoFilter('sepia hue-rotate-[220deg] saturate-150 invert');
+                          setPhotoViewOpen(true);
+                        }}
+                      >
+                        <img src={alert.images.moisture} alt="Влажность" className="w-full h-full object-cover transition-transform group-hover:scale-105 sepia hue-rotate-[220deg] saturate-150 invert" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-xs mt-2"
+                    onClick={() => {
+                      convertAlertToTask(alert.id);
+                      toast.success('Алерт сконвертирован в задание для волонтеров');
+                    }}
+                  >
+                    <Check className="h-3 w-3 mr-1" /> Создать задание
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {/* Upsell Dialog */}
       <Dialog open={upsellOpen} onOpenChange={setUpsellOpen}>
@@ -330,7 +484,7 @@ export default function Dashboard() {
               <img 
                 src={selectedPhotoUrl} 
                 alt="Увеличенное фото" 
-                className="max-w-full max-h-full object-contain"
+                className={`max-w-full max-h-full object-contain ${selectedPhotoFilter}`}
               />
             )}
             <Button

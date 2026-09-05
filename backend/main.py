@@ -4,7 +4,7 @@ from database import engine
 from models import Base
 import auth
 from contextlib import asynccontextmanager
-from routers import auth_router, tasks_router, reports_router, planetary_router
+from routers import auth_router, tasks_router, reports_router, planetary_router, gamification_router
 from seed import seed_users
 
 @asynccontextmanager
@@ -14,11 +14,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="OOPT Platform API", lifespan=lifespan)
 
-
 app.include_router(auth_router.router)
 app.include_router(tasks_router.router)
 app.include_router(reports_router.router)
 app.include_router(planetary_router.router)
+app.include_router(gamification_router.router)
 
 app.add_middleware(
     CORSMiddleware,

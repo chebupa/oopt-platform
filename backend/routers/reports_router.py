@@ -37,8 +37,16 @@ def update_report(report_id: int, report_update: ReportUpdate, db: Session = Dep
     db_report = db.query(Report).filter(Report.id == report_id).first()
     if not db_report:
         raise HTTPException(status_code=404, detail="Report not found")
-    
-    db_report.status = report_update.status
+    if report_update.status:
+        from models import ReportStatusEnum
+        if report_update.status == ReportStatusEnum.approved and db_report.status != ReportStatusEnum.approved:
+            # Award points for an approved pollution card
+            citizen = db.query(User).filter(User.id == db_report.citizen_id).first()
+            if citizen:
+                citizen.points += 20 # fixed reward for creating a report
+                db.add(citizen)
+        db_report.status = report_update.status
+
     db.commit()
     db.refresh(db_report)
     return db_report

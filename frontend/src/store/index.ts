@@ -46,18 +46,28 @@ export interface DzzAlert {
 }
 
 interface AppState {
-  currentUser: { role: UserRole; name: string } | null;
+  currentUser: { 
+    role: UserRole; 
+    name: string; 
+    profession?: string; 
+    has_completed_course?: boolean; 
+    completed_tasks_count?: number; 
+    trial_task_used?: boolean; 
+  } | null;
   userPoints: number;
   tasks: Task[];
   reports: Report[];
   applications: Application[];
   dzzAlerts: DzzAlert[];
-  setCurrentUser: (role: UserRole, name: string) => void;
+  setCurrentUser: (role: UserRole, name: string, profession?: string) => void;
   logout: () => void;
   addTask: (task: Omit<Task, 'id' | 'status'>) => void;
   completeTask: (taskId: string) => void;
   approveApplication: (appId: string) => void;
   rejectApplication: (appId: string) => void;
+  applyForTask: (taskId: string) => void;
+  completeCourse: () => void;
+  buyItem: (price: number) => void;
   convertAlertToTask: (alertId: string) => void;
   removeAlert: (alertId: string) => void;
   removeTask: (taskId: string) => void;
@@ -157,7 +167,16 @@ export const useAppStore = create<AppState>((set) => ({
   reports: [],
   applications: initialApplications,
   dzzAlerts: initialDzzAlerts,
-  setCurrentUser: (role, name) => set({ currentUser: { role, name } }),
+  setCurrentUser: (role, name, profession) => set({ 
+    currentUser: { 
+      role, 
+      name, 
+      profession, 
+      has_completed_course: false, 
+      completed_tasks_count: 0, 
+      trial_task_used: false 
+    } 
+  }),
   logout: () => set({ currentUser: null }),
   addTask: (task) => set((state) => ({
     tasks: [...state.tasks, { ...task, id: Date.now().toString(), status: 'open' }]
@@ -165,10 +184,50 @@ export const useAppStore = create<AppState>((set) => ({
   completeTask: (taskId) => set((state) => {
     const task = state.tasks.find(t => t.id === taskId);
     const earnedPoints = task?.points || 0;
+    const newCount = (state.currentUser?.completed_tasks_count || 0) + 1;
+    let newRole = state.currentUser?.role;
+    if (newRole === 'volunteer' && newCount >= 3) {
+      newRole = 'inspector';
+    }
     return {
       tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t),
       userPoints: state.userPoints + earnedPoints,
+      currentUser: state.currentUser ? {
+        ...state.currentUser,
+        role: newRole || state.currentUser.role,
+        completed_tasks_count: newCount
+      } : null
     };
+  }),
+  applyForTask: (taskId) => set((state) => {
+    if (!state.currentUser) return state;
+    if (!state.currentUser.has_completed_course) {
+      if (!state.currentUser.trial_task_used) {
+        return {
+          currentUser: {
+            ...state.currentUser,
+            trial_task_used: true
+          }
+        };
+      } else {
+        // throw error or handled in UI
+        return state;
+      }
+    }
+    return state; // Just logic representation for applying
+  }),
+  completeCourse: () => set((state) => {
+    if (!state.currentUser) return state;
+    return {
+      currentUser: { ...state.currentUser, has_completed_course: true },
+      userPoints: state.userPoints + 50
+    };
+  }),
+  buyItem: (price) => set((state) => {
+    if (state.userPoints >= price) {
+      return { userPoints: state.userPoints - price };
+    }
+    return state;
   }),
   approveApplication: (appId) => set((state) => ({
     applications: state.applications.map(a => a.id === appId ? { ...a, status: 'approved' } : a)

@@ -8,6 +8,7 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: RoleEnum
+    profession: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: str
@@ -21,7 +22,12 @@ class UserOut(BaseModel):
     id: int
     email: str
     role: RoleEnum
-    points: int = 0
+    profession: Optional[str] = None
+    has_completed_course: bool
+    completed_tasks_count: int
+    trial_task_used: bool
+    points: int
+    created_at: datetime
     
     class Config:
         from_attributes = True

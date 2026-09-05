@@ -246,13 +246,60 @@ export default function Dashboard() {
 
           {currentUser.role === 'volunteer' && (
             <div className="space-y-4">
-              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex justify-between items-center">
-                <div>
-                  <h3 className="text-sm font-semibold text-emerald-800">Ваш баланс</h3>
-                  <p className="text-2xl font-bold text-emerald-600">{useAppStore(state => state.userPoints)} <span className="text-sm font-medium">баллов</span></p>
+              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-semibold text-emerald-800">
+                      Баланс ({currentUser.profession || 'Волонтер'})
+                    </h3>
+                    <p className="text-2xl font-bold text-emerald-600">{useAppStore(state => state.userPoints)} <span className="text-sm font-medium">баллов</span></p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-white"
+                      onClick={() => router.push('/store')}
+                    >
+                      Магазин поощрений
+                    </Button>
+                  </div>
                 </div>
-                <div className="bg-emerald-100 p-2 rounded-full">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+
+                {/* Progression UI */}
+                <div className="bg-white rounded p-3 border text-sm space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Статус курса:</span>
+                    {currentUser.has_completed_course ? (
+                      <span className="text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Пройден</span>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          useAppStore.getState().completeCourse();
+                          toast.success('Курс пройден! Начислено 50 баллов.');
+                        }}
+                      >
+                        Пройти курс
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Выполнено заданий:</span>
+                    <span className="font-medium">{currentUser.completed_tasks_count || 0} / 3</span>
+                  </div>
+                  {(!currentUser.has_completed_course && !currentUser.trial_task_used) && (
+                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      Вам доступно 1 пробное задание без прохождения курса.
+                    </div>
+                  )}
+                  {(currentUser.completed_tasks_count || 0) >= 3 && (
+                    <div className="text-xs text-emerald-600 bg-emerald-50 p-2 rounded">
+                      Вы можете создавать свои задания! (Права инспектора разблокированы)
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -294,6 +341,15 @@ export default function Dashboard() {
                           className="w-full bg-emerald-600 hover:bg-emerald-700" 
                           size="sm"
                           onClick={() => {
+                            if (!currentUser.has_completed_course) {
+                              if (!currentUser.trial_task_used) {
+                                useAppStore.getState().applyForTask(task.id);
+                                toast.success('Вы использовали 1 пробное участие!');
+                              } else {
+                                toast.error('Сначала пройдите курс, чтобы выполнять задания!');
+                                return;
+                              }
+                            }
                             setActiveTaskId(task.id);
                             setReportText('');
                             setPhotoAttached(false);

@@ -1,0 +1,15 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<title>Error 500 Request failed.</title>
+</head>
+<body><h2>HTTP ERROR 500 Request failed.</h2>
+<table>
+<tr><th>URI:</th><td>/configuration/v1/wms/instances/4977ee22-0957-42f4-b883-3a36d2faaf63/layers</td></tr>
+<tr><th>STATUS:</th><td>500</td></tr>
+<tr><th>MESSAGE:</th><td>Request failed.</td></tr>
+<tr><th>SERVLET:</th><td>org.glassfish.jersey.servlet.ServletContainer-3fe98084</td></tr>
+</table>
+
+</body>
+</html>

@@ -4,25 +4,24 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Default open satellite raster style using ESRI World Imagery (requires no proprietary token)
+// Default open map style using OpenStreetMap
 const OPEN_SATELLITE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {
-    'satellite-tiles': {
+    'osm-tiles': {
       type: 'raster',
       tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       ],
       tileSize: 256,
-      attribution:
-        'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+      attribution: '&copy; OpenStreetMap contributors',
     },
   },
   layers: [
     {
-      id: 'satellite-tiles-layer',
+      id: 'osm-tiles-layer',
       type: 'raster',
-      source: 'satellite-tiles',
+      source: 'osm-tiles',
       minzoom: 0,
       maxzoom: 19,
     },

@@ -25,6 +25,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: U
         title=task.title,
         description=task.description,
         volunteers_needed=task.volunteers_needed,
+        points_reward=task.points_reward,
         geom=task.geom_wkt, # Expecting WKT format, GeoAlchemy handles it
         inspector_id=current_user.id
     )
@@ -40,6 +41,12 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Task not found")
     
     if task_update.status:
+        if task_update.status == TaskStatusEnum.done and db_task.status != TaskStatusEnum.done:
+            if db_task.volunteer_id:
+                volunteer = db.query(User).filter(User.id == db_task.volunteer_id).first()
+                if volunteer:
+                    volunteer.points += db_task.points_reward
+                    db.add(volunteer)
         db_task.status = task_update.status
     if task_update.volunteer_id:
         db_task.volunteer_id = task_update.volunteer_id

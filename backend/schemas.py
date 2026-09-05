@@ -21,6 +21,7 @@ class UserOut(BaseModel):
     id: int
     email: str
     role: RoleEnum
+    points: int = 0
     
     class Config:
         from_attributes = True
@@ -30,6 +31,7 @@ class TaskBase(BaseModel):
     title: str
     description: str
     volunteers_needed: int
+    points_reward: int = 0
     geom_wkt: str  # We will use WKT (Well-Known Text) for simplicity over JSON in this MVP
 
 class TaskCreate(TaskBase):

@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [photoViewOpen, setPhotoViewOpen] = useState(false);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
   const [selectedPhotoFilter, setSelectedPhotoFilter] = useState<string>('');
+  const [inspectorTab, setInspectorTab] = useState<'tasks' | 'applications'>('tasks');
 
   useEffect(() => {
     if (!currentUser) {
@@ -68,12 +69,12 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
-                  <Layers className="h-4 w-4" /> Слои спутника
+                  <Layers className="h-4 w-4" /> Слои карты
                 </h3>
                 <RadioGroup value={layer} onValueChange={handleLayerChange} className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="rgb" id="r1" />
-                    <Label htmlFor="r1" className="cursor-pointer">True Color (RGB)</Label>
+                    <Label htmlFor="r1" className="cursor-pointer">OpenStreetMap</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="infrared" id="r2" />
@@ -99,169 +100,234 @@ export default function Dashboard() {
 
 
               <div className="pt-4 border-t space-y-4">
-                <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
-                  <MapPin className="h-4 w-4" /> Опубликованные задания
-                </h3>
-                {tasks.length === 0 && <p className="text-sm text-gray-500">Нет опубликованных заданий.</p>}
-                
-                {tasks.map(task => (
-                  <Card key={task.id} className={task.status === 'completed' ? 'opacity-60 bg-gray-50' : ''}>
-                    <CardHeader className="p-3 pb-1">
-                      <CardTitle className="text-sm font-semibold flex items-start justify-between">
-                        <span>{task.title}</span>
-                        {task.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 ml-2" />}
-                      </CardTitle>
-                      <CardDescription className="text-xs mt-1">
-                        {task.status === 'open' ? 'В ожидании выполнения' : 'Выполнено'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-1 text-sm text-gray-600">
-                      {task.description && <p className="mb-2">{task.description}</p>}
-                      <div className="flex gap-2 mt-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                          onClick={() => {
-                            removeTask(task.id);
-                            toast.success('Задание удалено');
-                          }}
-                        >
-                          <X className="h-3 w-3 mr-1" /> Удалить
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                  <button 
+                    className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${inspectorTab === 'tasks' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => setInspectorTab('tasks')}
+                  >
+                    <MapPin className="h-3.5 w-3.5" /> Задания
+                  </button>
+                  <button 
+                    className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${inspectorTab === 'applications' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    onClick={() => setInspectorTab('applications')}
+                  >
+                    <Inbox className="h-3.5 w-3.5" /> Заявки
+                    {applications.filter(a => a.status === 'pending').length > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] px-1.5 rounded-full leading-tight py-0.5">
+                        {applications.filter(a => a.status === 'pending').length}
+                      </span>
+                    )}
+                  </button>
+                </div>
 
-              <div className="pt-4 border-t space-y-4">
-                <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
-                  <Inbox className="h-4 w-4" /> Заявки волонтеров
-                </h3>
-                {applications.length === 0 && <p className="text-sm text-gray-500">Нет новых заявок.</p>}
-                
-                {applications.map(app => (
-                  <Card key={app.id} className={app.status !== 'pending' ? 'opacity-60 bg-gray-50' : ''}>
-                    <CardHeader className="p-3 pb-1">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-sm font-semibold flex flex-col">
-                          <span>{app.volunteerName}</span>
-                          <span className="text-xs text-gray-500 font-normal">{app.date}</span>
-                        </CardTitle>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                          app.type === 'participation' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                        }`}>
-                          {app.type === 'participation' ? 'На участие' : 'Отчет о выполнении'}
-                        </span>
-                      </div>
-                      <CardDescription className="text-xs font-medium text-gray-800 mt-1">
-                        К заданию: «{app.taskTitle}»
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-1 text-sm text-gray-600">
-                      {app.comment && (
-                        <p className="bg-white p-2 rounded border text-xs italic mb-2">
-                          &quot;{app.comment}&quot;
-                        </p>
-                      )}
-                      
-                      {app.photoUrl && (
-                        <div 
-                          className="mb-3 relative w-full h-24 rounded border overflow-hidden cursor-pointer group"
-                          onClick={() => {
-                            setSelectedPhotoUrl(app.photoUrl || null);
-                            setSelectedPhotoFilter('');
-                            setPhotoViewOpen(true);
-                          }}
-                        >
-                          <img src={app.photoUrl} alt="Фото отчета" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                            <ImageIcon className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" />
+                {inspectorTab === 'tasks' ? (
+                  <div className="space-y-4">
+                    {tasks.length === 0 && <p className="text-sm text-gray-500">Нет опубликованных заданий.</p>}
+                    
+                    {tasks.map(task => (
+                      <Card key={task.id} className={task.status === 'completed' ? 'opacity-60 bg-gray-50' : ''}>
+                        <CardHeader className="p-3 pb-1">
+                          <CardTitle className="text-sm font-semibold flex items-start justify-between">
+                            <span>{task.title}</span>
+                            <div className="flex items-center">
+                              {task.points && <span className="text-xs text-emerald-600 font-medium mr-2">+{task.points} б.</span>}
+                              {task.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 ml-2" />}
+                            </div>
+                          </CardTitle>
+                          <CardDescription className="text-xs mt-1">
+                            {task.status === 'open' ? 'В ожидании выполнения' : 'Выполнено'}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-1 text-sm text-gray-600">
+                          {task.description && <p className="mb-2">{task.description}</p>}
+                          <div className="flex gap-2 mt-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                              onClick={() => {
+                                removeTask(task.id);
+                                toast.success('Задание удалено');
+                              }}
+                            >
+                              <X className="h-3 w-3 mr-1" /> Удалить
+                            </Button>
                           </div>
-                        </div>
-                      )}
-                      {app.status === 'pending' ? (
-                        <div className="flex gap-2 mt-3">
-                          <Button 
-                            size="sm" 
-                            variant="default"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
-                            onClick={() => {
-                              approveApplication(app.id);
-                              toast.success('Заявка одобрена');
-                            }}
-                          >
-                            <Check className="h-3 w-3 mr-1" /> Одобрить
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                            onClick={() => {
-                              rejectApplication(app.id);
-                              toast.success('Заявка отклонена');
-                            }}
-                          >
-                            <X className="h-3 w-3 mr-1" /> Отклонить
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-xs font-medium text-center">
-                          {app.status === 'approved' ? (
-                            <span className="text-emerald-600">✓ Одобрено</span>
-                          ) : (
-                            <span className="text-red-600">✗ Отклонено</span>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {applications.length === 0 && <p className="text-sm text-gray-500">Нет новых заявок.</p>}
+                    
+                    {applications.map(app => (
+                      <Card key={app.id} className={app.status !== 'pending' ? 'opacity-60 bg-gray-50' : ''}>
+                        <CardHeader className="p-3 pb-1">
+                          <div className="flex items-start justify-between">
+                            <CardTitle className="text-sm font-semibold flex flex-col">
+                              <span>{app.volunteerName}</span>
+                              <span className="text-xs text-gray-500 font-normal">{app.date}</span>
+                            </CardTitle>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                              app.type === 'participation' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {app.type === 'participation' ? 'На участие' : 'Отчет о выполнении'}
+                            </span>
+                          </div>
+                          <CardDescription className="text-xs font-medium text-gray-800 mt-1">
+                            К заданию: «{app.taskTitle}»
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-1 text-sm text-gray-600">
+                          {app.comment && (
+                            <p className="bg-white p-2 rounded border text-xs italic mb-2">
+                              &quot;{app.comment}&quot;
+                            </p>
                           )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                          
+                          {app.photoUrl && (
+                            <div 
+                              className="mb-3 relative w-full h-24 rounded border overflow-hidden cursor-pointer group"
+                              onClick={() => {
+                                setSelectedPhotoUrl(app.photoUrl || null);
+                                setSelectedPhotoFilter('');
+                                setPhotoViewOpen(true);
+                              }}
+                            >
+                              <img src={app.photoUrl} alt="Фото отчета" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                <ImageIcon className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" />
+                              </div>
+                            </div>
+                          )}
+                          {app.status === 'pending' ? (
+                            <div className="flex gap-2 mt-3">
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+                                onClick={() => {
+                                  approveApplication(app.id);
+                                  toast.success('Заявка одобрена');
+                                }}
+                              >
+                                <Check className="h-3 w-3 mr-1" /> Одобрить
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                onClick={() => {
+                                  rejectApplication(app.id);
+                                  toast.success('Заявка отклонена');
+                                }}
+                              >
+                                <X className="h-3 w-3 mr-1" /> Отклонить
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-xs font-medium text-center">
+                              {app.status === 'approved' ? (
+                                <span className="text-emerald-600">✓ Одобрено</span>
+                              ) : (
+                                <span className="text-red-600">✗ Отклонено</span>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {currentUser.role === 'volunteer' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-medium mb-2">Открытые задания</h3>
-              {tasks.length === 0 && <p className="text-sm text-gray-500">Нет заданий.</p>}
-              {tasks.map(task => (
-                <Card key={task.id} className={task.status === 'completed' ? 'opacity-60 bg-gray-50' : ''}>
-                  <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-base flex items-start justify-between">
-                      {task.title}
-                      {task.status === 'completed' && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {task.status === 'open' ? 'В ожидании' : 'Выполнено'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 text-sm text-gray-600">
-                    {task.description}
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0">
-                    {task.status === 'open' ? (
-                      <Button 
-                        className="w-full bg-emerald-600 hover:bg-emerald-700" 
-                        size="sm"
-                        onClick={() => {
-                          setActiveTaskId(task.id);
-                          setReportText('');
-                          setPhotoAttached(false);
-                          setReportOpen(true);
-                        }}
-                      >
-                        Прикрепить отчет и завершить
-                      </Button>
-                    ) : (
-                      <Button variant="outline" className="w-full" size="sm" disabled>
-                        Завершено
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              ))}
+              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-semibold text-emerald-800">Ваш баланс</h3>
+                  <p className="text-2xl font-bold text-emerald-600">{useAppStore(state => state.userPoints)} <span className="text-sm font-medium">баллов</span></p>
+                </div>
+                <div className="bg-emerald-100 p-2 rounded-full">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                </div>
+              </div>
+
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                <button 
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${inspectorTab === 'tasks' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => setInspectorTab('tasks')}
+                >
+                  <MapPin className="h-3.5 w-3.5" /> Доступные задания
+                </button>
+                <button 
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 ${inspectorTab === 'applications' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  onClick={() => setInspectorTab('applications')}
+                >
+                  <Inbox className="h-3.5 w-3.5" /> История участия
+                </button>
+              </div>
+
+              {inspectorTab === 'tasks' ? (
+                <>
+                  {tasks.filter(t => t.status === 'open').length === 0 && <p className="text-sm text-gray-500">Нет доступных заданий.</p>}
+                  {tasks.filter(t => t.status === 'open').map(task => (
+                    <Card key={task.id} className="hover:border-emerald-200 transition-colors">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-base flex items-start justify-between">
+                          <span>{task.title}</span>
+                          {task.points && (
+                            <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full whitespace-nowrap">
+                              +{task.points} баллов
+                            </span>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 text-sm text-gray-600">
+                        {task.description}
+                      </CardContent>
+                      <CardFooter className="p-4 pt-0">
+                        <Button 
+                          className="w-full bg-emerald-600 hover:bg-emerald-700" 
+                          size="sm"
+                          onClick={() => {
+                            setActiveTaskId(task.id);
+                            setReportText('');
+                            setPhotoAttached(false);
+                            setReportOpen(true);
+                          }}
+                        >
+                          Прикрепить отчет и завершить
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {tasks.filter(t => t.status === 'completed').length === 0 && <p className="text-sm text-gray-500">История пуста.</p>}
+                  {tasks.filter(t => t.status === 'completed').map(task => (
+                    <Card key={task.id} className="opacity-70 bg-gray-50">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-base flex items-start justify-between">
+                          <span className="line-through text-gray-500">{task.title}</span>
+                          {task.points && (
+                            <span className="text-emerald-600 font-medium text-sm flex items-center gap-1">
+                              +{task.points} <CheckCircle2 className="h-4 w-4" />
+                            </span>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 text-sm text-gray-500">
+                        Выполнено
+                      </CardContent>
+                    </Card>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

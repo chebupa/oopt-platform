@@ -1,4 +1,6 @@
 "use client";
+import * as maplibregl from "maplibre-gl";
+
 
 import { useState, useCallback } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
@@ -17,6 +19,7 @@ export default function MapComponent({ layer }: { layer: string }) {
   const [newTaskCoords, setNewTaskCoords] = useState<[number, number] | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
+  const [taskPoints, setTaskPoints] = useState(100);
 
   // Use a public ESRI satellite map style for true color or openstreetmap
   const mapStyle = layer === 'rgb' 
@@ -42,9 +45,33 @@ export default function MapComponent({ layer }: { layer: string }) {
           }
         ]
       }
-    : "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+    : {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "&copy; OpenStreetMap contributors",
+          },
+        },
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#f8f4f0" },
+          },
+          {
+            id: "osm-layer",
+            type: "raster",
+            source: "osm",
+            minzoom: 0,
+            maxzoom: 19,
+          },
+        ],
+      };
 
-  const handleMapClick = useCallback((e: any) => {
+  const handleMapClick = useCallback((e: maplibregl.MapMouseEvent) => {
     if (currentUser?.role === 'inspector') {
       setNewTaskCoords([e.lngLat.lng, e.lngLat.lat]);
       setIsModalOpen(true);
@@ -56,11 +83,13 @@ export default function MapComponent({ layer }: { layer: string }) {
       addTask({
         title: taskTitle,
         description: taskDescription,
+        points: taskPoints,
         coordinates: newTaskCoords
       });
       setIsModalOpen(false);
       setTaskTitle('');
       setTaskDescription('');
+      setTaskPoints(100);
       setNewTaskCoords(null);
       toast.success('Задание успешно создано на карте');
     }
@@ -74,9 +103,9 @@ export default function MapComponent({ layer }: { layer: string }) {
           latitude: 55.825,
           zoom: 13
         }}
-        mapStyle={mapStyle as any}
+        mapStyle={mapStyle as unknown as maplibregl.StyleSpecification}
         onClick={handleMapClick}
-        interactiveLayerIds={['satellite']}
+        interactiveLayerIds={layer === 'rgb' ? ['satellite'] : ['osm-layer']}
         cursor={currentUser?.role === 'inspector' ? 'crosshair' : 'grab'}
         attributionControl={false}
       >
@@ -116,6 +145,15 @@ export default function MapComponent({ layer }: { layer: string }) {
                 value={taskDescription} 
                 onChange={(e) => setTaskDescription(e.target.value)} 
                 placeholder="Подробности задания..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Баллы для волонтера</Label>
+              <Input 
+                type="number"
+                value={taskPoints} 
+                onChange={(e) => setTaskPoints(Number(e.target.value))} 
+                placeholder="100"
               />
             </div>
             {newTaskCoords && (

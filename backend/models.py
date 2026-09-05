@@ -27,6 +27,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), nullable=False)
+    points = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tasks_created = relationship("Task", foreign_keys="[Task.inspector_id]", back_populates="inspector")
@@ -45,6 +46,7 @@ class Task(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     volunteers_needed = Column(Integer, default=1, nullable=False)
+    points_reward = Column(Integer, default=0, nullable=False)
     geom = Column(Geometry('POLYGON', srid=4326), nullable=False)
     status = Column(Enum(TaskStatusEnum), default=TaskStatusEnum.open, nullable=False)
     

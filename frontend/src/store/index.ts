@@ -6,7 +6,9 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
+  points?: number;
   coordinates: [number, number]; // [longitude, latitude]
+  color?: string;
   status: 'open' | 'completed';
 }
 
@@ -45,6 +47,7 @@ export interface DzzAlert {
 
 interface AppState {
   currentUser: { role: UserRole; name: string } | null;
+  userPoints: number;
   tasks: Task[];
   reports: Report[];
   applications: Application[];
@@ -65,21 +68,27 @@ const initialTasks: Task[] = [
     id: '1',
     title: 'Убрать незаконную свалку',
     description: 'В районе озера обнаружена свалка строительного мусора',
-    coordinates: [37.712, 55.832], // Лосиный остров
+    points: 150,
+    coordinates: [37.712, 55.832],
+    color: '#ff4d4f', // Лосиный остров
     status: 'open',
   },
   {
     id: '2',
     title: 'Восстановление разметки тропы',
     description: 'Нужно обновить метки на деревьях вдоль экотропы',
+    points: 100,
     coordinates: [37.730, 55.825],
+    color: '#faad14',
     status: 'open',
   },
   {
     id: '3',
     title: 'Проверка фотоловушки #4',
     description: 'Заменить аккумуляторы и скачать данные',
+    points: 200,
     coordinates: [37.750, 55.840],
+    color: '#52c41a',
     status: 'completed',
   },
 ];
@@ -143,6 +152,7 @@ const initialDzzAlerts: DzzAlert[] = [
 
 export const useAppStore = create<AppState>((set) => ({
   currentUser: null,
+  userPoints: 200, // starting points (e.g. from task 3)
   tasks: initialTasks,
   reports: [],
   applications: initialApplications,
@@ -152,9 +162,14 @@ export const useAppStore = create<AppState>((set) => ({
   addTask: (task) => set((state) => ({
     tasks: [...state.tasks, { ...task, id: Date.now().toString(), status: 'open' }]
   })),
-  completeTask: (taskId) => set((state) => ({
-    tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t)
-  })),
+  completeTask: (taskId) => set((state) => {
+    const task = state.tasks.find(t => t.id === taskId);
+    const earnedPoints = task?.points || 0;
+    return {
+      tasks: state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t),
+      userPoints: state.userPoints + earnedPoints,
+    };
+  }),
   approveApplication: (appId) => set((state) => ({
     applications: state.applications.map(a => a.id === appId ? { ...a, status: 'approved' } : a)
   })),
@@ -170,6 +185,7 @@ export const useAppStore = create<AppState>((set) => ({
       title: `Проверка по ДЗЗ: ${alert.title}`,
       description: alert.description,
       coordinates: alert.coordinates,
+      color: '#1890ff',
       status: 'open'
     };
     
@@ -185,4 +201,3 @@ export const useAppStore = create<AppState>((set) => ({
     tasks: state.tasks.filter(t => t.id !== taskId)
   }))
 }));
-

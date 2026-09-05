@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from database import get_db
 from models import User
-from schemas import UserCreate, UserOut, Token
+from schemas import UserCreate, UserOut, Token, TaskOut
+from models import User, Task, RoleEnum
+from typing import List
 import auth
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -40,4 +42,10 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 @router.get("/me", response_model=UserOut)
 def get_current_user_profile(current_user: User = Depends(auth.get_current_user)):
     return current_user
+
+@router.get("/me/history", response_model=List[TaskOut])
+def get_user_history(db: Session = Depends(get_db), current_user: User = Depends(auth.get_current_user)):
+    if current_user.role == RoleEnum.volunteer:
+        return db.query(Task).filter(Task.volunteer_id == current_user.id).all()
+    return []
 

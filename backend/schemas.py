@@ -29,6 +29,7 @@ class UserOut(BaseModel):
 class TaskBase(BaseModel):
     title: str
     description: str
+    volunteers_needed: int
     geom_wkt: str  # We will use WKT (Well-Known Text) for simplicity over JSON in this MVP
 
 class TaskCreate(TaskBase):

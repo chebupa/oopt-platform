@@ -45,22 +45,26 @@ interface MapComponentProps {
   onMapClick?: (lng: number, lat: number) => void;
   wmsLayerUrl?: string;
   tasks: Task[];
+  draftPoints?: [number, number][];
 }
 
-function parseWktPoint(wkt?: string): [number, number] | null {
+function parseWktPolygon(wkt?: string): [number, number][] | null {
   if (!wkt) return null;
-  const match = wkt.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+  const match = wkt.match(/POLYGON\s*\(\(([^)]+)\)\)/i);
   if (match) {
-    const lng = parseFloat(match[1]);
-    const lat = parseFloat(match[2]);
-    if (!isNaN(lng) && !isNaN(lat)) {
-      return [lng, lat];
+    const coordsStr = match[1];
+    const points = coordsStr.split(',').map(pair => {
+      const [lng, lat] = pair.trim().split(/\s+/).map(Number);
+      return [lng, lat] as [number, number];
+    });
+    if (points.every(p => !isNaN(p[0]) && !isNaN(p[1]))) {
+      return points;
     }
   }
   return null;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, tasks }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, tasks, draftPoints }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const onMapClickRef = useRef(onMapClick);
@@ -117,19 +121,17 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
     const syncTasksSource = () => {
       const features = tasks
         .map((t) => {
-          let coordinates: [number, number] | null = null;
-          if (t.geom && Array.isArray(t.geom.coordinates) && t.geom.coordinates.length >= 2) {
-            coordinates = [t.geom.coordinates[0], t.geom.coordinates[1]];
-          } else if (t.geom_wkt) {
-            coordinates = parseWktPoint(t.geom_wkt);
+          let coordinates: [number, number][] | null = null;
+          if (t.geom_wkt) {
+            coordinates = parseWktPolygon(t.geom_wkt);
           }
-          if (!coordinates) return null;
+          if (!coordinates || coordinates.length < 3) return null;
 
           return {
             type: 'Feature' as const,
             geometry: {
-              type: 'Point' as const,
-              coordinates,
+              type: 'Polygon' as const,
+              coordinates: [coordinates],
             },
             properties: { id: t.id, title: t.title, status: t.status },
           };
@@ -150,23 +152,26 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
           data: featureCollection,
         });
 
-        if (!mapInstance.getLayer('tasks-layer')) {
+        if (!mapInstance.getLayer('tasks-layer-fill')) {
           mapInstance.addLayer({
-            id: 'tasks-layer',
-            type: 'circle',
+            id: 'tasks-layer-fill',
+            type: 'fill',
             source: 'tasks',
             paint: {
-              'circle-radius': 8,
-              'circle-stroke-width': 2,
-              'circle-stroke-color': '#ffffff',
-              'circle-color': [
-                'match',
-                ['get', 'status'],
-                'open', '#fbb03b',
-                'in_progress', '#223b53',
-                'done', '#2ecc71',
-                '#ccc',
-              ],
+              'fill-opacity': 0.6,
+              'fill-color': '#39ff14', // Acid Green
+            },
+          });
+        }
+        
+        if (!mapInstance.getLayer('tasks-layer-line')) {
+          mapInstance.addLayer({
+            id: 'tasks-layer-line',
+            type: 'line',
+            source: 'tasks',
+            paint: {
+              'line-width': 4,
+              'line-color': '#39ff14', // Acid Green
             },
           });
         }
@@ -202,7 +207,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
           tileSize: 256,
         });
 
-        const beforeLayerId = mapInstance.getLayer('tasks-layer') ? 'tasks-layer' : undefined;
+        const beforeLayerId = mapInstance.getLayer('tasks-layer-fill') ? 'tasks-layer-fill' : undefined;
         mapInstance.addLayer(
           {
             id: uniqueId,
@@ -222,12 +227,111 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
     applyWmsLayer();
   }, [wmsLayerUrl, mapLoaded]);
 
+  // Sync draft points layer
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    const mapInstance = map.current;
+    const pts = draftPoints || [];
+
+    const draftFeatures: GeoJSON.Feature[] = [];
+
+    // Add polygon if >= 3 points
+    if (pts.length >= 3) {
+      const polygonCoords = [...pts, pts[0]];
+      draftFeatures.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [polygonCoords]
+        },
+        properties: { draftType: 'Polygon' }
+      });
+    } else if (pts.length > 1) {
+      draftFeatures.push({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: pts
+        },
+        properties: { draftType: 'LineString' }
+      });
+    }
+
+    // Add points
+    pts.forEach(p => {
+      draftFeatures.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: p },
+        properties: { draftType: 'Point' }
+      });
+    });
+
+    const collection: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: draftFeatures
+    };
+
+    const source = mapInstance.getSource('draft') as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      source.setData(collection);
+    } else {
+      mapInstance.addSource('draft', { type: 'geojson', data: collection });
+      
+      mapInstance.addLayer({
+        id: 'draft-polygon',
+        type: 'fill',
+        source: 'draft',
+        filter: ['==', ['get', 'draftType'], 'Polygon'],
+        paint: {
+          'fill-color': '#39ff14',
+          'fill-opacity': 0.6
+        }
+      });
+      
+      mapInstance.addLayer({
+        id: 'draft-line',
+        type: 'line',
+        source: 'draft',
+        filter: ['==', ['get', 'draftType'], 'LineString'],
+        paint: {
+          'line-color': '#39ff14',
+          'line-width': 4
+        }
+      });
+
+      mapInstance.addLayer({
+        id: 'draft-points',
+        type: 'circle',
+        source: 'draft',
+        filter: ['==', ['get', 'draftType'], 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#39ff14',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#000'
+        }
+      });
+    }
+  }, [draftPoints, mapLoaded]);
+
   return (
     <div
       ref={mapContainer}
       className="absolute inset-0 w-full h-full"
       style={{ minHeight: '500px' }}
-    />
+    >
+      <div className="absolute top-16 left-4 bg-white p-2 rounded shadow text-xs z-50">
+        <div>Tasks prop count: {tasks?.length || 0}</div>
+        <div>Tasks with WKT: {tasks?.filter(t => t.geom_wkt).length || 0}</div>
+        <div>Tasks with valid points: {tasks?.filter(t => {
+          if (!t.geom_wkt) return false;
+          const match = t.geom_wkt.match(/POLYGON\s*\(\(([^)]+)\)\)/i);
+          if (!match) return false;
+          const pts = match[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
+          return pts.length >= 3 && pts.every(p => !isNaN(p[0]) && !isNaN(p[1]));
+        }).length || 0}</div>
+      </div>
+    </div>
   );
 };
 

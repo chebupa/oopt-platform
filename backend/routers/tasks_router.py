@@ -24,6 +24,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db), current_user: U
     db_task = Task(
         title=task.title,
         description=task.description,
+        volunteers_needed=task.volunteers_needed,
         geom=task.geom_wkt, # Expecting WKT format, GeoAlchemy handles it
         inspector_id=current_user.id
     )

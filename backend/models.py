@@ -44,7 +44,8 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
-    geom = Column(Geometry('POINT', srid=4326), nullable=False)
+    volunteers_needed = Column(Integer, default=1, nullable=False)
+    geom = Column(Geometry('POLYGON', srid=4326), nullable=False)
     status = Column(Enum(TaskStatusEnum), default=TaskStatusEnum.open, nullable=False)
     
     inspector_id = Column(Integer, ForeignKey("users.id"), nullable=False)

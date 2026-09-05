@@ -3,9 +3,9 @@ import * as maplibregl from "maplibre-gl";
 
 
 import { useState, useCallback } from 'react';
-import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
+import Map, { Marker, Popup, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useAppStore } from '@/store';
+import { useAppStore, Task } from '@/store';
 import { MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 export default function MapComponent({ layer }: { layer: string }) {
   const { tasks, currentUser, addTask } = useAppStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newTaskCoords, setNewTaskCoords] = useState<[number, number] | null>(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -118,11 +119,37 @@ export default function MapComponent({ layer }: { layer: string }) {
             latitude={task.coordinates[1]}
             anchor="bottom"
           >
-            <div className={`cursor-pointer transform hover:scale-110 transition-transform ${task.status === 'open' ? 'text-red-500' : 'text-emerald-500'}`}>
+            <div 
+              className={`cursor-pointer transform hover:scale-110 transition-transform ${task.status === 'open' ? 'text-red-500' : 'text-emerald-500'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedTask(task);
+              }}
+            >
               <MapPin size={32} fill="currentColor" className="text-white" />
             </div>
           </Marker>
         ))}
+
+        {selectedTask && (
+          <Popup
+            longitude={selectedTask.coordinates[0]}
+            latitude={selectedTask.coordinates[1]}
+            anchor="top"
+            closeOnClick={false}
+            onClose={() => setSelectedTask(null)}
+          >
+            <div className="p-2 max-w-sm">
+              <h3 className="font-bold text-sm mb-1">{selectedTask.title}</h3>
+              {selectedTask.description && (
+                <p className="text-xs text-gray-600 mb-2">{selectedTask.description}</p>
+              )}
+              <div className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded inline-block">
+                Награда: {selectedTask.points} баллов
+              </div>
+            </div>
+          </Popup>
+        )}
       </Map>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

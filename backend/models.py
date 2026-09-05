@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Enum, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Enum, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 from geoalchemy2 import Geometry
 
@@ -27,6 +27,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), nullable=False)
+    profession = Column(String, nullable=True)
+    has_completed_course = Column(Boolean, default=False, nullable=False)
+    completed_tasks_count = Column(Integer, default=0, nullable=False)
+    trial_task_used = Column(Boolean, default=False, nullable=False)
     points = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 

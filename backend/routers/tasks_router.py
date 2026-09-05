@@ -46,9 +46,20 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
                 volunteer = db.query(User).filter(User.id == db_task.volunteer_id).first()
                 if volunteer:
                     volunteer.points += db_task.points_reward
+                    volunteer.completed_tasks_count += 1
+                    if volunteer.completed_tasks_count >= 3:
+                        volunteer.role = RoleEnum.inspector
                     db.add(volunteer)
         db_task.status = task_update.status
+    
     if task_update.volunteer_id:
+        if task_update.volunteer_id == current_user.id:
+            if not current_user.has_completed_course:
+                if not current_user.trial_task_used:
+                    current_user.trial_task_used = True
+                    db.add(current_user)
+                else:
+                    raise HTTPException(status_code=403, detail="Необходимо пройти курс для выполнения следующих заданий")
         db_task.volunteer_id = task_update.volunteer_id
         
     db.commit()

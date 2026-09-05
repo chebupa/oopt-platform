@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:15-3.4
+    container_name: oopt_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oopt_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oopt_password}
+      POSTGRES_DB: ${POSTGRES_DB:-oopt_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oopt_user} -d ${POSTGRES_DB:-oopt_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: oopt_backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oopt_user}:${POSTGRES_PASSWORD:-oopt_password}@db:5432/${POSTGRES_DB:-oopt_db}
+      SECRET_KEY: ${SECRET_KEY:-supersecretkey}
+      DATA_MODE: ${DATA_MODE:-mock}
+      COPERNICUS_USERNAME: ${COPERNICUS_USERNAME:-}
+      COPERNICUS_PASSWORD: ${COPERNICUS_PASSWORD:-}
+      COPERNICUS_INSTANCE_ID: ${COPERNICUS_INSTANCE_ID:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    container_name: oopt_frontend
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

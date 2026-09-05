@@ -9,18 +9,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { LogOut, Layers, MapPin, CheckCircle2, Camera, Upload, Image as ImageIcon } from 'lucide-react';
+import { LogOut, Layers, MapPin, CheckCircle2, Camera, Upload, Image as ImageIcon, Inbox, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { currentUser, logout, tasks, completeTask } = useAppStore();
+  const { currentUser, logout, tasks, completeTask, applications, approveApplication, rejectApplication } = useAppStore();
   const [layer, setLayer] = useState('rgb');
   const [upsellOpen, setUpsellOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [reportText, setReportText] = useState('');
   const [photoAttached, setPhotoAttached] = useState(false);
+  const [photoViewOpen, setPhotoViewOpen] = useState(false);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -91,6 +93,90 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-500 bg-blue-50 p-3 rounded text-balance">
                   💡 Кликните по карте в любой области леса, чтобы создать новое задание.
                 </p>
+              </div>
+
+              <div className="pt-4 border-t space-y-4">
+                <h3 className="text-sm font-medium flex items-center gap-2 mb-3 text-gray-700">
+                  <Inbox className="h-4 w-4" /> Заявки волонтеров
+                </h3>
+                {applications.length === 0 && <p className="text-sm text-gray-500">Нет новых заявок.</p>}
+                
+                {applications.map(app => (
+                  <Card key={app.id} className={app.status !== 'pending' ? 'opacity-60 bg-gray-50' : ''}>
+                    <CardHeader className="p-3 pb-1">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-sm font-semibold flex flex-col">
+                          <span>{app.volunteerName}</span>
+                          <span className="text-xs text-gray-500 font-normal">{app.date}</span>
+                        </CardTitle>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                          app.type === 'participation' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {app.type === 'participation' ? 'На участие' : 'Отчет о выполнении'}
+                        </span>
+                      </div>
+                      <CardDescription className="text-xs font-medium text-gray-800 mt-1">
+                        К заданию: «{app.taskTitle}»
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-1 text-sm text-gray-600">
+                      {app.comment && (
+                        <p className="bg-white p-2 rounded border text-xs italic mb-2">
+                          "{app.comment}"
+                        </p>
+                      )}
+                      
+                      {app.photoUrl && (
+                        <div 
+                          className="mb-3 relative w-full h-24 rounded border overflow-hidden cursor-pointer group"
+                          onClick={() => {
+                            setSelectedPhotoUrl(app.photoUrl || null);
+                            setPhotoViewOpen(true);
+                          }}
+                        >
+                          <img src={app.photoUrl} alt="Фото отчета" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                            <ImageIcon className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" />
+                          </div>
+                        </div>
+                      )}
+                      {app.status === 'pending' ? (
+                        <div className="flex gap-2 mt-3">
+                          <Button 
+                            size="sm" 
+                            variant="default"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+                            onClick={() => {
+                              approveApplication(app.id);
+                              toast.success('Заявка одобрена');
+                            }}
+                          >
+                            <Check className="h-3 w-3 mr-1" /> Одобрить
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="w-full h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            onClick={() => {
+                              rejectApplication(app.id);
+                              toast.success('Заявка отклонена');
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Отклонить
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs font-medium text-center">
+                          {app.status === 'approved' ? (
+                            <span className="text-emerald-600">✓ Одобрено</span>
+                          ) : (
+                            <span className="text-red-600">✗ Отклонено</span>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           )}
@@ -232,6 +318,30 @@ export default function Dashboard() {
               Отправить отчет и завершить задание
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Viewer Dialog */}
+      <Dialog open={photoViewOpen} onOpenChange={setPhotoViewOpen}>
+        <DialogContent className="sm:max-w-3xl p-1 overflow-hidden bg-black/95 border-none">
+          <DialogTitle className="sr-only">Просмотр фото</DialogTitle>
+          <div className="relative w-full h-[80vh] flex items-center justify-center">
+            {selectedPhotoUrl && (
+              <img 
+                src={selectedPhotoUrl} 
+                alt="Увеличенное фото" 
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
+              onClick={() => setPhotoViewOpen(false)}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

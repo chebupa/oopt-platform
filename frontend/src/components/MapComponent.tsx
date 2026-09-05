@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -69,6 +69,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
     onMapClickRef.current = onMapClick;
   }, [onMapClick]);
 
+  const [mapLoaded, setMapLoaded] = useState(false);
+
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
@@ -85,6 +87,10 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
       if (onMapClickRef.current) {
         onMapClickRef.current(e.lngLat.lng, e.lngLat.lat);
       }
+    });
+
+    mapInstance.once('load', () => {
+      setMapLoaded(true);
     });
 
     map.current = mapInstance;
@@ -105,12 +111,10 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
 
   // Sync tasks GeoJSON layer with map
   useEffect(() => {
-    if (!map.current) return;
+    if (!map.current || !mapLoaded) return;
     const mapInstance = map.current;
 
     const syncTasksSource = () => {
-      if (!mapInstance.isStyleLoaded()) return;
-
       const features = tasks
         .map((t) => {
           let coordinates: [number, number] | null = null;
@@ -169,34 +173,30 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
       }
     };
 
-    if (mapInstance.isStyleLoaded()) {
-      syncTasksSource();
-    } else {
-      const onLoad = () => syncTasksSource();
-      mapInstance.once('load', onLoad);
-      return () => {
-        mapInstance.off('load', onLoad);
-      };
-    }
-  }, [tasks]);
+    syncTasksSource();
+  }, [tasks, mapLoaded]);
 
   // Sync WMS overlay layer
+  const activeWmsLayerRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!map.current) return;
+    if (!map.current || !mapLoaded) return;
     const mapInstance = map.current;
 
     const applyWmsLayer = () => {
-      if (!mapInstance.isStyleLoaded()) return;
-
-      if (mapInstance.getSource('copernicus-wms')) {
-        if (mapInstance.getLayer('copernicus-wms-layer')) {
-          mapInstance.removeLayer('copernicus-wms-layer');
-        }
-        mapInstance.removeSource('copernicus-wms');
+      // Clean up previous WMS layer if it exists
+      if (activeWmsLayerRef.current) {
+        const oldId = activeWmsLayerRef.current;
+        if (mapInstance.getLayer(oldId)) mapInstance.removeLayer(oldId);
+        if (mapInstance.getSource(oldId)) mapInstance.removeSource(oldId);
+        activeWmsLayerRef.current = null;
       }
 
       if (wmsLayerUrl) {
-        mapInstance.addSource('copernicus-wms', {
+        // Use a unique ID to prevent MapLibre synchronous remove/add conflicts
+        const uniqueId = `planetary-tiles-${Date.now()}`;
+        
+        mapInstance.addSource(uniqueId, {
           type: 'raster',
           tiles: [wmsLayerUrl],
           tileSize: 256,
@@ -205,28 +205,22 @@ const MapComponent: React.FC<MapComponentProps> = ({ onMapClick, wmsLayerUrl, ta
         const beforeLayerId = mapInstance.getLayer('tasks-layer') ? 'tasks-layer' : undefined;
         mapInstance.addLayer(
           {
-            id: 'copernicus-wms-layer',
+            id: uniqueId,
             type: 'raster',
-            source: 'copernicus-wms',
+            source: uniqueId,
             paint: {
               'raster-opacity': 0.7,
             },
           },
           beforeLayerId
         );
+        
+        activeWmsLayerRef.current = uniqueId;
       }
     };
 
-    if (mapInstance.isStyleLoaded()) {
-      applyWmsLayer();
-    } else {
-      const onLoad = () => applyWmsLayer();
-      mapInstance.once('load', onLoad);
-      return () => {
-        mapInstance.off('load', onLoad);
-      };
-    }
-  }, [wmsLayerUrl]);
+    applyWmsLayer();
+  }, [wmsLayerUrl, mapLoaded]);
 
   return (
     <div

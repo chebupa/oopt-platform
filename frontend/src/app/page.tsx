@@ -86,7 +86,7 @@ export default function Home() {
     }
 
     try {
-      const res = await api.post('/copernicus/wms-url', {
+      const res = await api.post('/planetary/tile-url', {
         bbox: "{bbox-epsg-3857}",
         layer: layer
       });
